@@ -66,7 +66,6 @@
                     isNormalUser = true;
                     extraGroups = [
                       "docker"
-                      "nixbld"
                       "wheel"
                     ];
                     shell = pkgs.bashInteractive;
