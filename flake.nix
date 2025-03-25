@@ -37,6 +37,7 @@
                   curl
                   git
                   nano
+                  nix-output-monitor
                   nixfmt-rfc-style
                   nixos-container
                   tzdata
