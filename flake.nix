@@ -52,7 +52,10 @@
                 };
 
                 programs = {
-                  direnv.enable = true;
+                  direnv = {
+                    enable = true;
+                    nix-direnv.enable = true;
+                  };
                 };
 
                 services.vscode-server.enable = true;
