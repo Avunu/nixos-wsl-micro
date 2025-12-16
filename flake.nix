@@ -56,6 +56,7 @@
                     enable = true;
                     nix-direnv.enable = true;
                   };
+                  nix-ld.enable = true;
                 };
 
                 services.vscode-server.enable = true;
