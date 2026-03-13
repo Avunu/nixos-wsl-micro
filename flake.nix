@@ -1,4 +1,6 @@
 {
+  description = "NixOS WSL Micro Configuration";
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixos-wsl = {
@@ -12,81 +14,128 @@
   };
 
   outputs =
-    {
+    inputs@{
       self,
       nixpkgs,
       nixos-wsl,
       vscode-server,
       ...
     }:
+    let
+      lib = nixpkgs.lib;
+    in
     {
-      nixosConfigurations = {
-        nixos = nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-          modules = [
-
-            nixos-wsl.nixosModules.default
-
-            vscode-server.nixosModules.default
-
-            (
-              { pkgs, lib, ... }:
-              {
-
-                environment.systemPackages = with pkgs; [
-                  curl
-                  git
-                  nano
-                  nix-output-monitor
-                  nixfmt-rfc-style
-                  nixos-container
-                  tzdata
-                  wget
-                ];
-
-                nix.settings = {
-                  experimental-features = [
-                    "nix-command"
-                    "flakes"
-                  ];
-                };
-
-                programs = {
-                  direnv = {
-                    enable = true;
-                    nix-direnv.enable = true;
-                  };
-                  nix-ld.enable = true;
-                };
-
-                services.vscode-server.enable = true;
-
-                system = {
-                  stateVersion = "24.11";
-                };
-
-                users = {
-                  users.nixos = {
-                    isNormalUser = true;
-                    extraGroups = [
-                      "docker"
-                      "wheel"
-                    ];
-                    shell = pkgs.bashInteractive;
-                  };
-                };
-
-                wsl = {
-                  enable = true;
-                  defaultUser = "nixos";
-                  docker-desktop.enable = true;
-                  startMenuLaunchers = true;
-                  useWindowsDriver = true;
-                };
-              }
-            )
+      nixosModules.wsl =
+        {
+          config,
+          lib,
+          pkgs,
+          ...
+        }:
+        with lib;
+        let
+          cfg = config.wslMicro;
+        in
+        {
+          imports = [
+            inputs.nixos-wsl.nixosModules.default
+            inputs.vscode-server.nixosModules.default
           ];
+
+          options.wslMicro = {
+            defaultUser = mkOption {
+              type = types.str;
+              default = "nixos";
+              description = "Default WSL user";
+            };
+            stateVersion = mkOption {
+              type = types.str;
+              default = "24.11";
+              description = "NixOS state version";
+            };
+            extraPackages = mkOption {
+              type = types.listOf types.package;
+              default = [ ];
+              description = "Additional packages to install";
+            };
+            dockerIntegration = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Enable Docker Desktop integration";
+            };
+            autoUpgrade = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Enable automatic daily NixOS upgrades";
+            };
+          };
+
+          config = {
+            environment.systemPackages =
+              with pkgs;
+              [
+                curl
+                git
+                nano
+                nix-output-monitor
+                nixfmt
+                nixos-container
+                tzdata
+                wget
+              ]
+              ++ cfg.extraPackages;
+
+            nix.settings = {
+              experimental-features = [
+                "nix-command"
+                "flakes"
+              ];
+            };
+
+            programs = {
+              direnv = {
+                enable = true;
+                nix-direnv.enable = true;
+              };
+              nix-ld.enable = true;
+            };
+
+            services.vscode-server.enable = true;
+
+            system = {
+              stateVersion = cfg.stateVersion;
+              autoUpgrade = lib.mkIf cfg.autoUpgrade {
+                enable = true;
+                allowReboot = false;
+                dates = "daily";
+                flake = "/etc/nixos/flake.nix";
+                flags = [
+                  "--update-input"
+                  "nixos-wsl-micro"
+                  "--update-input"
+                  "nixpkgs"
+                  "--refresh"
+                  "--impure"
+                ];
+              };
+            };
+
+            users.users.${cfg.defaultUser} = {
+              isNormalUser = true;
+              extraGroups =
+                [ "wheel" ]
+                ++ lib.optional cfg.dockerIntegration "docker";
+              shell = pkgs.bashInteractive;
+            };
+
+            wsl = {
+              enable = true;
+              defaultUser = cfg.defaultUser;
+              docker-desktop.enable = cfg.dockerIntegration;
+              startMenuLaunchers = true;
+              useWindowsDriver = true;
+            };
+          };
         };
-      };
     };
 }
